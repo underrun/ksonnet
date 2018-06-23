@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"strings"
 
 	"github.com/ksonnet/ksonnet/pkg/app"
 	str "github.com/ksonnet/ksonnet/pkg/util/strings"
@@ -93,13 +94,14 @@ func (c *Config) GetAPISpec() string {
 		return defaultVersion
 	}
 
-	openAPIDoc, err := dc.OpenAPISchema()
+	serverVersion, err := dc.ServerVersion()
 	if err != nil {
-		log.WithError(err).Debug("Failed to retrieve OpenAPI schema")
+		log.WithError(err).Debug("Failed to retrieve kubernetes server version")
 		return defaultVersion
 	}
 
-	return fmt.Sprintf("version:%s", openAPIDoc.Info.Version)
+	k8sAPISpec := fmt.Sprintf("version:%s", serverVersion)
+	return strings.Split(k8sAPISpec, "+")[0]
 }
 
 // Namespace returns the namespace for the provided ClientConfig.
