@@ -46,6 +46,11 @@ func TestConfig_GetAPISpec(t *testing.T) {
 		{
 			name:    "with dev version",
 			version: "version:v1.9.3",
+			disc:    &fakeDiscovery{withVersion: "v1.9.3-fadecafe"},
+		},
+		{
+			name:    "with dev version",
+			version: "version:v1.9.3",
 			disc:    &fakeDiscovery{withVersion: "v1.9.3+facade"},
 		},
 		{
