@@ -126,7 +126,7 @@ func (p *Pipeline) moduleParams(module component.Module, inherited bool) (string
 		return stubModule(module)
 	}
 
-	paramsStr, err := module.ResolvedParams(p.envName)
+	_, paramsStr, err := module.ResolvedParams(p.envName)
 	if err != nil {
 		return "", errors.Wrapf(err, "resolve params for %s", module.Name())
 	}
@@ -195,7 +195,7 @@ func (p *Pipeline) moduleObjects(module component.Module, filter []string) ([]*u
 	doc.Fields = append(doc.Fields, object.Fields...)
 
 	// apply environment parameters
-	moduleParamData, err := module.ResolvedParams(p.envName)
+	noGlobalParamData, moduleParamData, err := module.ResolvedParams(p.envName)
 	if err != nil {
 		return nil, err
 	}
@@ -258,7 +258,7 @@ func (p *Pipeline) moduleObjects(module component.Module, filter []string) ([]*u
 		case "jsonnet":
 			patched = string(data)
 		case "yaml":
-			patched, err = params.PatchJSON(string(data), envParamData, componentName)
+			patched, err = params.PatchJSON(string(data), noGlobalParamData, componentName)
 			if err != nil {
 				return nil, errors.Wrap(err, "patching YAML/JSON component")
 			}

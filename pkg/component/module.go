@@ -64,7 +64,7 @@ type Module interface {
 	// Render renders the components in the module to a Jsonnet object.
 	Render(envName string, componentNames ...string) (*astext.Object, map[string]string, error)
 	// ResolvedParams evaluates the parameters for a module within an environment.
-	ResolvedParams(envName string) (string, error)
+	ResolvedParams(envName string) (string, string, error)
 	// SetParam sets a parameter for module.
 	SetParam(path []string, value interface{}) error
 }
@@ -236,15 +236,15 @@ func (mp *ModuleParameter) IsSameType(other ModuleParameter) bool {
 
 // ResolvedParams resolves parameters for a module. It returns a JSON encoded
 // string of component parameters.
-func (m *FilesystemModule) ResolvedParams(envName string) (string, error) {
+func (m *FilesystemModule) ResolvedParams(envName string) (string, string, error) {
 	s, err := m.readParams()
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	envCode, err := params.JsonnetEnvObject(m.app, envName)
 	if err != nil {
-		return "", errors.Wrap(err, "building environment argument")
+		return "", "", errors.Wrap(err, "building environment argument")
 	}
 
 	vm := jsonnet.NewVM()
@@ -257,17 +257,17 @@ func (m *FilesystemModule) ResolvedParams(envName string) (string, error) {
 
 	output, err := vm.EvaluateSnippet("params.libsonnet", s)
 	if err != nil {
-		return "", errors.Wrap(err, "evaluating params.libsonnet")
+		return "", "", errors.Wrap(err, "evaluating params.libsonnet")
 	}
 
 	n, err := jsonnet.ParseNode("params.libsonnet", output)
 	if err != nil {
-		return "", errors.Wrap(err, "parsing parameters")
+		return "", "", errors.Wrap(err, "parsing parameters")
 	}
 
 	object, ok := n.(*astext.Object)
 	if !ok {
-		return "", errors.Errorf("params.libsonnet did not evaluate to an object (%T)", n)
+		return "", "", errors.Errorf("params.libsonnet did not evaluate to an object (%T)", n)
 	}
 
 	var componentsObject *astext.Object
@@ -275,7 +275,7 @@ func (m *FilesystemModule) ResolvedParams(envName string) (string, error) {
 	for _, f := range object.Fields {
 		id, err := jsonnet.FieldID(f)
 		if err != nil {
-			return "", err
+			return "", "", err
 		}
 
 		if id == "components" {
@@ -284,7 +284,7 @@ func (m *FilesystemModule) ResolvedParams(envName string) (string, error) {
 	}
 
 	if componentsObject == nil {
-		return "", errors.New("could not find components object in params")
+		return "", "", errors.New("could not find components object in params")
 	}
 
 	currentFields := make(map[string]bool)
@@ -292,7 +292,7 @@ func (m *FilesystemModule) ResolvedParams(envName string) (string, error) {
 	for _, f := range componentsObject.Fields {
 		id, err := jsonnet.FieldID(f)
 		if err != nil {
-			return "", err
+			return "", "", err
 		}
 
 		currentFields[id] = true
@@ -300,10 +300,16 @@ func (m *FilesystemModule) ResolvedParams(envName string) (string, error) {
 
 	var buf bytes.Buffer
 	if err := printer.Fprint(&buf, object); err != nil {
-		return "", errors.Wrap(err, "could not update params")
+		return "", "", errors.Wrap(err, "could not update params")
 	}
 
-	return applyGlobals(buf.String())
+	params := buf.String()
+	paramsWithGlobals, err := applyGlobals(params)
+	if err != nil {
+		return "", "", err
+	}
+
+	return params, paramsWithGlobals, nil
 }
 
 // Params returns the params for a module.
